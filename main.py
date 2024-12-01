@@ -25,29 +25,29 @@ class GitEventManager:
         self.root = tk.Tk()
         print("GUI initialized successfully")
         
-        # 设置窗口标题
+        # Set window title
         self.root.title("Git Event Manager")
         print("Window title set successfully")
         
-        # 初始化路径变量
-        self.repo_path = tk.StringVar()  # 移除 value=os.getcwd()
+        # Initialize path variable
+        self.repo_path = tk.StringVar()  # Remove value=os.getcwd()
         
-        # 设置事件存储路径 - 移到这里
+        # Set event storage path - move here
         self.events_base_path = os.path.expanduser("~/git_branch_manager/git_events")
         self.events_path = tk.StringVar(value=self.events_base_path)
         
-        # 确保基础目录存在
+        # Ensure base directory exists
         os.makedirs(self.events_base_path, exist_ok=True)
         
-        # 初始化事件存储相关变量
+        # Initialize event storage related variables
         self.current_event_file = None
-        self.events_by_date = {}  # 按日期组织的事件
-        self.events_by_branch = {}  # 按分支组织的事件
+        self.events_by_date = {}  # Events organized by date
+        self.events_by_branch = {}  # Events organized by branch
         
-        # 初始化操作计数
+        # Initialize operation count
         self.operation_count = 0
         
-        # 初始化变量
+        # Initialize variables
         self.base_type = tk.StringVar(value="branch")
         self.branch_prefix = tk.StringVar()
         self.branch_custom_suffix = tk.StringVar()
@@ -66,17 +66,17 @@ class GitEventManager:
         self.merge_vars = {'branch': {}, 'tag': {}}
         self.events = []
         
-        # 添加缓存变量
-        self.cached_branches = []  # 缓存所有分支
-        self.cached_tags = []      # 缓存所有标签
-        self.cached_remote_branches = []  # 缓存远程分支
+        # Add cache variables
+        self.cached_branches = []  # Cache all branches
+        self.cached_tags = []      # Cache all tags
+        self.cached_remote_branches = []  # Cache remote branches
         
-        # 添加操作控制变量
+        # Add operation control variables
         self.enable_branch_creation = tk.BooleanVar(value=False)
         self.enable_merge = tk.BooleanVar(value=False)
         self.enable_tag_creation = tk.BooleanVar(value=False)
         
-        # 初始化控件列表
+        # Initialize control lists
         self.branch_controls = []
         self.merge_controls = []
         self.tag_controls = []
@@ -85,26 +85,26 @@ class GitEventManager:
         self.setup_ui()
         print("UI setup completed")
         
-        # 检查并设置Git用户信息
+        # Check and set Git user information
         self.check_git_config()
         
-        # 加载所有事件文件
+        # Load all event files
         self.load_all_events()
 
     def select_repo_path(self):
-        """选择仓库路径"""
+        """Select repository path"""
         path = filedialog.askdirectory(
             title="Select Git Repository",
-            initialdir=os.getcwd()  # 使用当前目录作为初始目录
+            initialdir=os.getcwd()  # Use current directory as initial directory
         )
         if path:
             self.repo_path.set(path)
-            self.init_repo()  # 只在选择路径后初始化仓库
+            self.init_repo()  # Only initialize repository after path selection
             self.log_operation(f"Selected repository path: {path}")
             self.update_status("Repository path selected", success=True)
 
     def init_repo(self):
-        """初始化或更新Git仓库"""
+        """Initialize or update Git repository"""
         try:
             if not self.repo_path.get():
                 self.log_operation("No repository path selected")
@@ -114,10 +114,10 @@ class GitEventManager:
             self.repo = git.Repo(self.repo_path.get())
             print("Git repository initialized successfully")
             
-            # 初始化时加载所有信息到缓存
+            # Initialize all information to cache
             self.refresh_repo_cache()
             
-            # 更新所有相关显示
+            # Update all related displays
             self.update_current_branch_labels()
             self.refresh_merge_items()
             self.update_base_items()
@@ -131,18 +131,18 @@ class GitEventManager:
             messagebox.showerror("Error", f"Failed to initialize repository: {error_msg}")
 
     def refresh_repo_cache(self):
-        """刷新仓库缓存信息"""
+        """Refresh repository cache information"""
         try:
-            # 获取远程仓库信息
+            # Get remote repository information
             remote = self.repo.remote()
             remote.fetch()
             self.repo.git.fetch('--tags')
             
-            # 更新分支缓存
+            # Update branch cache
             current = self.repo.active_branch.name
             self.cached_branches = [branch.name for branch in self.repo.heads if branch.name != current]
             
-            # 更新远程分支缓存
+            # Update remote branch cache
             self.cached_remote_branches = []
             for ref in remote.refs:
                 if ref.name == f"{remote.name}/HEAD":
@@ -151,10 +151,10 @@ class GitEventManager:
                 if branch_name not in self.cached_branches and branch_name != current:
                     self.cached_remote_branches.append(branch_name)
             
-            # 更新标签缓存
+            # Update tag cache
             self.cached_tags = [tag.name for tag in self.repo.tags]
             
-            # 更新UI显示
+            # Update UI display
             self.update_current_branch_labels()
             self.refresh_merge_items()
             self.update_base_items()
@@ -168,17 +168,17 @@ class GitEventManager:
             self.update_status("Failed to refresh repository cache", success=False)
 
     def create_log_widgets(self):
-        """创建日志和状态文本框"""
-        # 创建日志文本框
+        """Create log and status text widgets"""
+        # Create log text widget
         self.log_text = tk.Text(self.root, height=6, wrap=tk.WORD)
         self.log_text.configure(state='disabled')
         
-        # 创建状态文本框
+        # Create status text widget
         self.status_text = tk.Text(self.root, height=3, wrap=tk.WORD)
         self.status_text.configure(state='disabled')
 
     def update_current_branch_labels(self):
-        """新所有显示当前分支的标签"""
+        """Update all display current branch labels"""
         try:
             current = self.repo.active_branch.name
             branch_text = f"{current}"
@@ -193,7 +193,7 @@ class GitEventManager:
             print(f"Error updating branch labels: {str(e)}")
 
     def refresh_branch_name(self):
-        """手动刷新分支名称"""
+        """Manually refresh branch name"""
         try:
             remote = self.repo.remote()
             self.log_operation("Fetching remote branches...")
@@ -208,19 +208,19 @@ class GitEventManager:
             self.update_status("Failed to refresh branch name", success=False)
 
     def refresh_merge_items(self):
-        """刷新合并项目列表（使用缓存）"""
+        """Refresh merge project list (using cache)"""
         try:
-            # 清空现有的复选框
+            # Clear existing checkboxes
             for widget in self.merge_inner_frame.winfo_children():
                 widget.destroy()
             
-            # 获分支
+            # Get branches
             current = self.repo.active_branch.name
             
-            # 使用缓存的分支信息
+            # Use cached branch information
             all_branches = sorted(set(self.cached_branches + self.cached_remote_branches))
             
-            # 重新创选框
+            # Recreate checkboxes
             row = 0
             if all_branches:
                 ttk.Label(self.merge_inner_frame, text="Branches:").grid(
@@ -245,7 +245,7 @@ class GitEventManager:
                         row=row, column=0, sticky='w', padx=20, pady=2)
                     row += 1
             
-            # 更新画布滚动区域
+            # Update canvas scroll region
             self.merge_inner_frame.update_idletasks()
             self.merge_canvas.configure(scrollregion=self.merge_canvas.bbox('all'))
             
@@ -254,7 +254,7 @@ class GitEventManager:
             self.log_operation(f"Error refreshing merge items: {error_msg}")
             self.update_status(f"Failed to refresh merge items: {error_msg}", success=False)
     def refresh_tag_name(self):
-        """动刷新签名称"""
+        """Refresh tag name"""
         try:
             self.log_operation("Fetching remote tags...")
             self.repo.git.fetch('--tags')
@@ -268,9 +268,9 @@ class GitEventManager:
             self.update_status("Failed to refresh tag name", success=False)
 
     def update_branch_name(self, *args):
-        """更新最终分支称"""
+        """Update final branch name"""
         try:
-            # 果域被禁用且不是初始化调用，则返回
+            # If the domain is disabled and not the initial call, return
             if not self.enable_branch_creation.get() and args:
                 return
             
@@ -278,7 +278,7 @@ class GitEventManager:
             custom = self.branch_custom_suffix.get()
             date = self.branch_date_suffix.get()
             
-            # 构建基础分支名称
+            # Build base branch name
             if prefix == 'custom':
                 if not custom:
                     self.final_branch_name.set('')
@@ -289,20 +289,20 @@ class GitEventManager:
                 if custom:
                     base_name = f"{base_name}_{custom}"
             
-            # 获取所有分支（包括远程分支）
+            # Get all branches (including remote branches)
             all_branches = [branch.name for branch in self.repo.heads]
             remote_branches = [ref.name.split('/')[-1] for ref in self.repo.remote().refs 
                              if not ref.name.endswith('/HEAD')]
             existing_branches = list(set(all_branches + remote_branches))
             
-            # 如果名称已存在添加数字后缀
+            # If the name already exists, add a number suffix
             if base_name in existing_branches:
-                # 查找所有相似的分支名
+                # Find all similar branch names
                 pattern = re.compile(f"^{re.escape(base_name)}(\\.\\d+)?$")
                 similar_branches = [b for b in existing_branches if pattern.match(b)]
                 
                 if similar_branches:
-                    # 找出最大的编号
+                    # Find the largest number
                     max_number = 0
                     for branch in similar_branches:
                         if branch == base_name:
@@ -315,7 +315,7 @@ class GitEventManager:
                             except (IndexError, ValueError):
                                 continue
                     
-                    # 使用下一个编号
+                    # Use the next number
                     final_name = f"{base_name}.{max_number + 1}"
                 else:
                     final_name = f"{base_name}.1"
@@ -329,13 +329,13 @@ class GitEventManager:
             self.final_branch_name.set('')
 
     def update_tag_name(self, *args, force_check=False):
-        """更新最终标签名称"""
+        """Update final tag name"""
         try:
             prefix = self.tag_prefix.get()
             custom = self.tag_custom_suffix.get()
             date = self.tag_date_suffix.get()
             
-            # 构建基础标签名称
+            # Build base tag name
             if prefix == 'custom':
                 if not custom:
                     self.final_tag_name.set('')
@@ -346,21 +346,21 @@ class GitEventManager:
                 if custom:
                     base_name = f"{base_name}_{custom}"
             
-            # 如果是强制检查，重新获取远程信息
+            # If it's a forced check, re-fetch remote information
             if force_check:
                 self.repo.git.fetch('--tags')
             
-            # 获取所有标签
+            # Get all tags
             existing_tags = [tag.name for tag in self.repo.tags]
             
-            # 如果名称已存在，添加数字后缀
+            # If the name already exists, add a number suffix
             if base_name in existing_tags:
-                # 查找所有相似的标签名
+                # Find all similar tag names
                 pattern = re.compile(f"^{re.escape(base_name)}(\\.\\d+)?$")
                 similar_tags = [t for t in existing_tags if pattern.match(t)]
                 
                 if similar_tags:
-                    # 找出最大的编号
+                    # Find the largest number
                     max_number = 0
                     for tag in similar_tags:
                         if tag == base_name:
@@ -373,7 +373,7 @@ class GitEventManager:
                             except (IndexError, ValueError):
                                 continue
                     
-                    # 使用下一个编号
+                    # Use the next number
                     final_name = f"{base_name}.{max_number + 1}"
                 else:
                     final_name = f"{base_name}.1"
@@ -387,30 +387,30 @@ class GitEventManager:
             self.final_tag_name.set('')
 
     def log_operation(self, message, details=""):
-        """记录操作日志"""
+        """Record operation log"""
         try:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             log_message = f"[{timestamp}] {message}\n"
             if details:
                 log_message += f"Details:\n{details}\n"
             
-            # 用日志文本框编辑
+            # Use log text widget for editing
             self.log_text.configure(state='normal')
             
-            # 插日志息日志文本框
+            # Insert log message into log text widget
             self.log_text.insert(tk.END, log_message)
             
-            # 滚动到底部
+            # Scroll to the bottom
             self.log_text.see(tk.END)
             
-            # 禁用日志文本框编辑
+            # Disable log text widget editing
             self.log_text.configure(state='disabled')
             
         except Exception as e:
             print(f"Error logging operation: {str(e)}")
 
     def update_status(self, message, success=True):
-        """更状态栏"""
+        """Update status bar"""
         try:
             timestamp = datetime.now().strftime('%H:%M:%S')
             
@@ -418,116 +418,116 @@ class GitEventManager:
             status_message += f"{message}\n"
             status_message += "-" * 30 + "\n"
             
-            # 启用状态文本框编辑
+            # Enable status text widget for editing
             self.status_text.configure(state='normal')
             
-            # 插入状态消息到状态文本框
+            # Insert status message into status text widget
             self.status_text.insert(tk.END, status_message)
             
-            # 滚动到底部
+            # Scroll to the bottom
             self.status_text.see(tk.END)
             
-            # 禁用状态文本框编辑
+            # Disable status text widget editing
             self.status_text.configure(state='disabled')
             
-            # 增加操作计数
+            # Increase operation count
             self.operation_count += 1
             
         except Exception as e:
             print(f"Error updating status: {str(e)}")
     def setup_ui(self):
-        """设置用户界面"""
-        # 1. 设置主窗口
+        """Set up user interface"""
+        # 1. Set main window
         self.root.resizable(True, True)
         self.root.minsize(800, 600)
         
-        # 2. 创建左右分割的主布局
+        # 2. Create main layout (left and right panes)
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         main_paned.pack(fill=tk.BOTH, expand=True)
         
-        # 3. 先创建右侧面板（包含log和status文本框）
+        # 3. First create right panel (contains log and status text widgets)
         right_panel = self.create_right_panel(main_paned)
         
-        # 4. 创左侧面板
+        # 4. Create left panel
         left_panel = self.create_left_panel(main_paned)
         self.create_events_path_section(left_panel)
         
-        # 5. 将左右面板添加到主分割窗口
+        # 5. Add left and right panels to the main split window
         main_paned.add(left_panel)
         main_paned.add(right_panel)
         
-        # 6. 设置分割位置（左侧70%，右侧30%）
+        # 6. Set split position (left 70%, right 30%)
         self.root.update()
         main_paned.sashpos(0, int(self.root.winfo_width() * 0.7))
 
     def create_left_panel(self, parent):
-        """创建左侧面板"""
-        # 1. 创建左侧容器
+        """Create left panel"""
+        # 1. Create left container
         left_container = ttk.Frame(parent)
         
-        # 2. 创建路径选择区域（新增）
+        # 2. Create path selection area (new)
         self.create_path_section(left_container)
         
-        # 3. 创建画布和滚动条
+        # 3. Create canvas and scrollbar
         canvas = tk.Canvas(left_container)
         scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
         
-        # 4. 创滚动框架
+        # 4. Create scrollable frame
         scrollable_frame = ttk.Frame(canvas)
         scrollable_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        # 5. 在画布上创建窗口
+        # 5. Create window on canvas
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
-        # 6. 创建事件信息区域
+        # 6. Create event information area
         self.create_event_info_section(scrollable_frame)
         
-        # 7. 创建Git操作区域
+        # 7. Create Git operations area
         self.create_git_operations_section(scrollable_frame)
         
-        # 8. 创建工具栏（移除路径选择部分）
+        # 8. Create toolbar (remove path selection part)
         self.create_toolbar(scrollable_frame)
         
-        # 9. 布局画布和滚动条
+        # 9. Layout canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # 10. 绑定鼠标滚轮
+        # 10. Bind mouse wheel
         canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
         
         return left_container
 
     def create_path_section(self, parent):
-        """建路径选择区域"""
+        """Create path selection area"""
         path_frame = ttk.LabelFrame(parent, text="Repository Path")
         path_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # 创建内部框架
+        # Create inner frame
         inner_frame = ttk.Frame(path_frame)
         inner_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 路径输入框
+        # Path entry
         path_entry = ttk.Entry(inner_frame, textvariable=self.repo_path, state='readonly')
         path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
         
-        # 刷新按钮
+        # Refresh button
         refresh_btn = ttk.Button(inner_frame, text="↻", width=3, command=self.refresh_repo_cache)
         refresh_btn.pack(side=tk.RIGHT, padx=(0, 5))
         
-        # 浏览按钮
+        # Browse button
         select_path_btn = ttk.Button(inner_frame, text="Browse", command=self.select_repo_path)
         select_path_btn.pack(side=tk.RIGHT)
 
     def create_toolbar(self, parent):
-        """创建工具栏"""
+        """Create toolbar"""
         toolbar = ttk.Frame(parent)
         toolbar.pack(fill=tk.X, padx=10, pady=5)
         
-        # 保存和历史按钮
+        # Save and history buttons
         save_event_btn = ttk.Button(toolbar, text="Save Event", command=self.save_current_event)
         save_event_btn.pack(side=tk.RIGHT, padx=5)
         
@@ -535,89 +535,89 @@ class GitEventManager:
         history_btn.pack(side=tk.RIGHT, padx=5)
 
     def create_right_panel(self, parent):
-        """创建右侧面板"""
+        """Create right panel"""
         right_frame = ttk.Frame(parent)
         
-        # 1. 创建状态区域
+        # 1. Create status area
         status_frame = ttk.LabelFrame(right_frame, text="Status")
         status_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 创建状态文本框容器
+        # Create status text widget container
         status_container = ttk.Frame(status_frame)
         status_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 创建状态文本框 - 增加height值
-        self.status_text = tk.Text(status_container, height=8, wrap=tk.WORD)  # 从height=3改为8
+        # Create status text widget - increase height value
+        self.status_text = tk.Text(status_container, height=8, wrap=tk.WORD)  # Changed from height=3 to 8
         self.status_text.configure(state='disabled')
         
-        # 创建状态滚动条
+        # Create status scrollbar
         status_scrollbar = ttk.Scrollbar(status_container, orient="vertical", 
                                        command=self.status_text.yview)
         
-        # 使grid布局管理器
-        self.status_text.grid(row=0, column=0, sticky='nsew', padx=(0, 2))  # 添加右侧padding
+        # Use grid layout manager
+        self.status_text.grid(row=0, column=0, sticky='nsew', padx=(0, 2))  # Added right padding
         status_scrollbar.grid(row=0, column=1, sticky='ns')
         
-        # 配���文本框的滚动
+        # Configure text widget scrolling
         self.status_text.configure(yscrollcommand=status_scrollbar.set)
         
-        # 配置grid权重
+        # Configure grid weights
         status_container.grid_columnconfigure(0, weight=1)
         status_container.grid_rowconfigure(0, weight=1)
         
-        # 2. 创建日志区域
+        # 2. Create log area
         log_frame = ttk.LabelFrame(right_frame, text="Operation Log")
         log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 创建日志文本框容器
+        # Create log text widget container
         log_container = ttk.Frame(log_frame)
         log_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 创建日志文本框
-        self.log_text = tk.Text(log_container, height=15, wrap=tk.WORD)  # 调整height
+        # Create log text widget
+        self.log_text = tk.Text(log_container, height=15, wrap=tk.WORD)  # Changed height
         self.log_text.configure(state='disabled')
         
-        # 创建日志滚动条
+        # Create log scrollbar
         log_scrollbar = ttk.Scrollbar(log_container, orient="vertical", 
                                     command=self.log_text.yview)
         
-        # 使用grid布局管理器
-        self.log_text.grid(row=0, column=0, sticky='nsew', padx=(0, 2))  # 添加右侧padding
+        # Use grid layout manager
+        self.log_text.grid(row=0, column=0, sticky='nsew', padx=(0, 2))  # Added right padding
         log_scrollbar.grid(row=0, column=1, sticky='ns')
         
-        # 配置文本框的滚动
+        # Configure text widget scrolling
         self.log_text.configure(yscrollcommand=log_scrollbar.set)
         
-        # 配置grid权重
+        # Configure grid weights
         log_container.grid_columnconfigure(0, weight=1)
         log_container.grid_rowconfigure(0, weight=1)
         
-        # 配置右侧面板的权重，让Operation Log区域占据更多间
+        # Configure right panel weights, let Operation Log area occupy more space
         right_frame.pack_configure(fill=tk.BOTH, expand=True)
         
         return right_frame
 
     def create_event_info_section(self, parent):
-        """创建事件信息区域"""
+        """Create event information area"""
         frame = ttk.LabelFrame(parent, text="Event Information")
         frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # 事件标题
+        # Event title
         ttk.Label(frame, text="Event Title:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.event_title).grid(row=0, column=1, sticky='ew', padx=5, pady=5)
         
-        # 事件描述
+        # Event description
         ttk.Label(frame, text="Description:").grid(row=1, column=0, sticky='w', padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.event_description).grid(row=1, column=1, sticky='ew', padx=5, pady=5)
         
-        # 事件备注
+        # Event notes
         ttk.Label(frame, text="Notes:").grid(row=2, column=0, sticky='w', padx=5, pady=5)
         ttk.Entry(frame, textvariable=self.event_notes).grid(row=2, column=1, sticky='ew', padx=5, pady=5)
         
         frame.grid_columnconfigure(1, weight=1)
 
     def create_git_operations_section(self, parent):
-        """创建Git操作区域"""
+        """Create Git operations area"""
         frame = ttk.LabelFrame(parent, text="Git Operations")
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
@@ -636,11 +636,11 @@ class GitEventManager:
         # 5. Push Section
         self.create_push_section(frame)
         
-        # 所有域创建完成后，更状态
+        # All domains created, update state
         self.update_sections_state()
 
     def update_base_items(self, *args):
-        """更新基础项目列表"""
+        """Update base item list"""
         try:
             search_text = self.base_search_var.get().lower()
             self.base_items_listbox.delete(0, tk.END)
@@ -656,7 +656,7 @@ class GitEventManager:
                 if search_text in item.lower():
                     self.base_items_listbox.insert(tk.END, item)
                 
-            # 如果只有一个选项，自动选中它
+            # If there's only one option, automatically select it
             if self.base_items_listbox.size() == 1:
                 self.base_items_listbox.select_set(0)
                 self.base_items_listbox.event_generate('<<ListboxSelect>>')
@@ -666,56 +666,56 @@ class GitEventManager:
             self.update_status("Failed to update base items", success=False)
 
     def create_branch(self):
-        """创建新分支"""
+        """Create new branch"""
         try:
-            # 获取新分支名称
+            # Get new branch name
             new_branch_name = self.final_branch_name.get()
             if not new_branch_name:
                 messagebox.showerror("Error", "Branch name cannot be empty")
                 return
             
-            # 获取基础项目（从 Listbox 获取选中项）
+            # Get base item (from Listbox, get selected item)
             selections = self.base_items_listbox.curselection()
             if not selections:
-                # 如果没有选择基础项目，但有自动生成的分支名称，则使用当前分支作为基础
+                # If no base item is selected, but there's a generated branch name, use the current branch as the base
                 current_branch = self.repo.active_branch.name
                 base_item = current_branch
                 self.log_operation(f"No base item selected, using current branch: {current_branch}")
             else:
                 base_item = self.base_items_listbox.get(selections[0])
-                # 如果是远程分支，去掉 "(remote)" 后缀
+                # If it's a remote branch, remove "(remote)" suffix
                 if "(remote)" in base_item:
                     base_item = base_item.split(" (remote)")[0]
             
-            # 保存基础分支名称供后续使用
+            # Save base branch name for later use
             self.current_base_branch = base_item
             
-            # 记录操作
+            # Record operation
             self.log_operation(f"Creating new branch: {new_branch_name}", 
                              f"Base {self.base_type.get()}: {base_item}")
             
-            # 切换到基础项目
+            # Check out base item
             if self.base_type.get() == "branch":
                 self.repo.git.checkout(base_item)
             else:
                 self.repo.git.checkout(base_item)
             
-            # 创建新分支
+            # Create new branch
             self.repo.git.checkout('-b', new_branch_name)
             
-            # 更新状态
+            # Update status
             self.update_status(f"Created new branch: {new_branch_name}")
             
-            # 更新基础项目列表
+            # Update base item list
             self.update_base_items()
             
-            # 更新当前分支显示
+            # Update current branch display
             self.update_current_branch_labels()
             
-            # 显示成功消息
+            # Show success message
             messagebox.showinfo("Success", f"Branch '{new_branch_name}' created successfully")
             
-            # 创建分支成功后更新 Push 区域显示
+            # Update Push area display after branch creation is successful
             self.update_push_labels()
             
         except Exception as e:
@@ -725,9 +725,9 @@ class GitEventManager:
             messagebox.showerror("Error", f"Failed to create branch: {error_msg}")
 
     def merge_branches(self):
-        """合并选中的分支和标签"""
+        """Merge selected branches and tags"""
         try:
-            # 获取选中的分支和标签
+            # Get selected branches and tags
             selected_branches = [branch for branch, var in self.merge_vars['branch'].items() 
                                if var.get()]
             selected_tags = [tag for tag, var in self.merge_vars['tag'].items() 
@@ -737,35 +737,35 @@ class GitEventManager:
                 messagebox.showwarning("Warning", "Please select at least one branch or tag")
                 return
             
-            # 记录操作
+            # Record operation
             self.log_operation("Starting merge operation", 
                              f"Selected branches: {selected_branches}\n"
                              f"Selected tags: {selected_tags}")
             
-            merged_info = []  # 存储合并信息
+            merged_info = []  # Store merge information
             
-            # 合并分支
+            # Merge branches
             for branch in selected_branches:
                 try:
                     self.log_operation(f"Merging branch: {branch}")
                     
-                    # 获取分支的最新提交信息
+                    # Get the latest commit information of the branch
                     if '(remote)' in branch:
                         branch_name = branch.split(' (remote)')[0]
                         commit = self.repo.remote().refs[branch_name].commit
                     else:
                         commit = self.repo.heads[branch].commit
                     
-                    # 记录分支信息
+                    # Record branch information
                     branch_info = {
                         'name': branch,
-                        'commit_id': commit.hexsha[:8],  # 只取前8位
+                        'commit_id': commit.hexsha[:8],  # Only take the first 8 digits
                         'commit_message': commit.message.strip(),
                         'commit_author': commit.author.name,
                         'commit_date': datetime.fromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     }
                     
-                    # 执行合并
+                    # Execute merge
                     self.repo.git.merge(branch, '--no-ff')
                     merged_info.append(branch_info)
                     
@@ -783,16 +783,16 @@ class GitEventManager:
                         self.repo.git.merge('--abort')
                         return
             
-            # 合并标签
+            # Merge tags
             for tag in selected_tags:
                 try:
                     self.log_operation(f"Merging tag: {tag}")
                     
-                    # 获取签的提交信息
+                    # Get commit information of the tag
                     tag_obj = self.repo.tags[tag]
                     commit = tag_obj.commit
                     
-                    # 记录标签信息
+                    # Record tag information
                     tag_info = {
                         'name': f"tag:{tag}",
                         'commit_id': commit.hexsha[:8],
@@ -801,7 +801,7 @@ class GitEventManager:
                         'commit_date': datetime.fromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     }
                     
-                    # 执行合并
+                    # Execute merge
                     self.repo.git.merge(tag, '--no-ff')
                     merged_info.append(tag_info)
                     
@@ -819,10 +819,10 @@ class GitEventManager:
                         self.repo.git.merge('--abort')
                         return
             
-            # 刷新合并项目列表
+            # Refresh merge project list
             self.refresh_merge_items()
             
-            # 返回合并信息
+            # Return merge information
             return merged_info
             
         except Exception as e:
@@ -833,33 +833,33 @@ class GitEventManager:
             return None
 
     def create_tag(self):
-        """创建新标签"""
+        """Create new tag"""
         try:
-            # 获新标签名
+            # Get new tag name
             new_tag_name = self.final_tag_name.get()
             if not new_tag_name:
                 messagebox.showerror("Error", "Tag name cannot be empty")
                 return
             
-            # 记录操作
+            # Record operation
             self.log_operation(f"Creating new tag: {new_tag_name}")
             
-            # 创建新标签
+            # Create new tag
             self.repo.create_tag(new_tag_name)
             
-            # 推送标签到程
+            # Push tag to remote
             self.repo.remote().push(new_tag_name)
             
-            # 更新状态
+            # Update status
             self.update_status(f"Created new tag: {new_tag_name}")
             
-            # 刷新合并项目列表
+            # Refresh merge project list
             self.refresh_merge_items()
             
-            # 显示成功消息
+            # Show success message
             messagebox.showinfo("Success", f"Tag '{new_tag_name}' created successfully")
             
-            # 更新Push区域显示
+            # Update Push area display
             self.update_push_labels()
             
         except Exception as e:
@@ -869,14 +869,14 @@ class GitEventManager:
             messagebox.showerror("Error", f"Failed to create tag: {error_msg}")
 
     def run(self):
-        """运行应用程序"""
+        """Run the application"""
         self.root.mainloop()
 
     def save_current_event(self):
-        """保存当前事件"""
+        """Save current event"""
         try:
             if not self.event_title.get():
-                messagebox.showwarning("Warning", "请输入事件标题")
+                messagebox.showwarning("Warning", "Please enter event title")
                 return
             
             event = GitEvent()
@@ -887,57 +887,57 @@ class GitEventManager:
             event.created_tag = self.final_tag_name.get()
             event.notes = self.event_notes.get()
             
-            # 使用保存的基础分支名称
+            # Use the saved base branch name
             event.base_branch = getattr(self, 'current_base_branch', self.repo.active_branch.name)
             
-            # 使用执行操作时保存的合并信息
+            # Use merge information saved during operation execution
             if hasattr(self, 'last_merged_info') and self.last_merged_info:
                 event.merged_branches_info = self.last_merged_info
                 event.merged_branches = [info['name'] for info in self.last_merged_info]
             
-            # 创建日期目录
+            # Create date directory
             date_dir = os.path.join(self.events_path.get(), 
                                    datetime.now().strftime('%Y-%m-%d'))
             os.makedirs(date_dir, exist_ok=True)
             
-            # 创建文件名（使用时间戳和分支名）
+            # Create file name (using timestamp and branch name)
             timestamp = datetime.now().strftime('%H%M%S')
             branch_name = self.repo.active_branch.name.replace('/', '_')
             filename = f"{timestamp}_{branch_name}.json"
             
-            # 完整的文件路径
+            # Full file path
             file_path = os.path.join(date_dir, filename)
             
-            # 保存事件
+            # Save event
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(event.__dict__, f, ensure_ascii=False, indent=2)
             
-            # 更新事件缓存
+            # Update event cache
             self.load_all_events()
             
-            # 显示成功消息
-            messagebox.showinfo("Success", "事件保存成功")
+            # Show success message
+            messagebox.showinfo("Success", "Event saved successfully")
             
-            # 清空输入框
+            # Clear input fields
             self.event_title.set("")
             self.event_description.set("")
             self.event_notes.set("")
             self.last_merged_info = None
-            self.current_base_branch = None  # 清除基础分支记录
+            self.current_base_branch = None  # Clear base branch record
             
         except Exception as e:
             error_msg = str(e)
-            self.log_operation(f"保存事件时出错: {error_msg}")
-            self.update_status("保存事件失败", success=False)
-            messagebox.showerror("Error", f"保存事件失败: {error_msg}")
+            self.log_operation(f"Error saving event: {error_msg}")
+            self.update_status("Failed to save event", success=False)
+            messagebox.showerror("Error", f"Failed to save event: {error_msg}")
 
     def load_all_events(self):
-        """加载所有事件文件"""
+        """Load all event files"""
         try:
             self.events_by_date = {}
             self.events_by_branch = {}
             
-            # 遍历事件目录
+            # Iterate over event directories
             for root, dirs, files in os.walk(self.events_path.get()):
                 for file in files:
                     if file.endswith('.json'):
@@ -945,87 +945,87 @@ class GitEventManager:
                         with open(file_path, 'r', encoding='utf-8') as f:
                             event_data = json.load(f)
                             
-                            # 创建事件对象
+                            # Create event object
                             event = GitEvent()
                             for key, value in event_data.items():
                                 setattr(event, key, value)
                             
-                            # 按日期组织
+                            # Organize by date
                             date = event.date.split()[0]
                             if date not in self.events_by_date:
                                 self.events_by_date[date] = []
                             self.events_by_date[date].append(event)
                             
-                            # 按分支组织
+                            # Organize by branch
                             branch = event.base_branch
                             if branch not in self.events_by_branch:
                                 self.events_by_branch[branch] = []
                             self.events_by_branch[branch].append(event)
             
         except Exception as e:
-            self.log_operation(f"加载事件时出错: {str(e)}")
-            self.update_status("加载事件失败", success=False)
+            self.log_operation(f"Error loading events: {str(e)}")
+            self.update_status("Failed to load events", success=False)
 
     def show_event_history(self):
-        """显示事件历史"""
+        """Show event history"""
         history_window = tk.Toplevel(self.root)
-        history_window.title("事历史")
+        history_window.title("Event History")
         history_window.geometry("1000x600")
         
-        # 创建左右分割面板
+        # Create left and right split panels
         paned = ttk.PanedWindow(history_window, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True)
         
-        # 左侧过滤面板
+        # Left filter panel
         filter_frame = ttk.Frame(paned)
         paned.add(filter_frame)
         
-        # 创建过滤选项
-        ttk.Label(filter_frame, text="查看方式:").pack(pady=5)
+        # Create filter options
+        ttk.Label(filter_frame, text="View:").pack(pady=5)
         view_var = tk.StringVar(value="date")
-        ttk.Radiobutton(filter_frame, text="按日期", variable=view_var, 
+        ttk.Radiobutton(filter_frame, text="By Date", variable=view_var, 
                         value="date", command=lambda: update_tree("date")).pack()
-        ttk.Radiobutton(filter_frame, text="按分支", variable=view_var, 
+        ttk.Radiobutton(filter_frame, text="By Branch", variable=view_var, 
                         value="branch", command=lambda: update_tree("branch")).pack()
         
-        # 搜索框
-        ttk.Label(filter_frame, text="搜索:").pack(pady=(10,0))
+        # Search box
+        ttk.Label(filter_frame, text="Search:").pack(pady=(10,0))
         search_var = tk.StringVar()
         search_entry = ttk.Entry(filter_frame, textvariable=search_var)
         search_entry.pack(pady=5)
         
-        # 右侧事件显示区域
+        # Right event display area
         right_frame = ttk.Frame(paned)
         paned.add(right_frame)
         
-        # 创建树形视图
+        # Create tree view
         tree = ttk.Treeview(right_frame, columns=(
             'Time', 'Title', 'Branch', 'Tag', 'Description'
         ), show='headings')
         
-        tree.heading('Time', text='时间')
-        tree.heading('Title', text='标题')
-        tree.heading('Branch', text='创建分支')
-        tree.heading('Tag', text='创建标签')
-        tree.heading('Description', text='描述')
+        tree.heading('Time', text='Time')
+        tree.heading('Title', text='Title')
+        tree.heading('Branch', text='Created Branch')
+        tree.heading('Tag', text='Created Tag')
+        tree.heading('Description', text='Description')
         
-        # 设置列宽
-        tree.column('Time', width=150)
+        # Set column widths - increase Time column width to accommodate full date
+        tree.column('Time', width=180)  # Increased from 150
         tree.column('Title', width=150)
         tree.column('Branch', width=150)
         tree.column('Tag', width=100)
         tree.column('Description', width=200)
         
-        # 添加滚动条
+        # Add scrollbar
         scrollbar = ttk.Scrollbar(right_frame, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         
-        # 布局
+        # Layout
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         def update_tree(view_type):
-            """更新树形视图"""
+            """Update tree view"""
             tree.delete(*tree.get_children())
             search_text = search_var.get().lower()
             
@@ -1041,7 +1041,7 @@ class GitEventManager:
                         search_text in event.description.lower() or
                         search_text in event.created_branch.lower()):
                         tree.insert(parent, 'end', values=(
-                            event.date.split()[1],
+                            event.date,  # Show full date and time instead of just time
                             event.title,
                             event.created_branch,
                             event.created_tag,
@@ -1049,64 +1049,66 @@ class GitEventManager:
                         ))
         
         def on_search(*args):
-            """搜索事件处理"""
+            """Search event processing"""
             update_tree(view_var.get())
         
-        # 绑定搜索事件
+        # Bind search event
         search_var.trace_add("write", on_search)
         
-        # 显示事件详情
+        # Show event details
         def show_details(event):
+            """Show event details"""
             item = tree.selection()[0]
-            if tree.parent(item):  # 确保选择的是事件而不是分组
+            if tree.parent(item):  # Ensure the selected item is an event, not a group
                 values = tree.item(item)['values']
                 if values:
                     details_window = tk.Toplevel(history_window)
-                    details_window.title("事件详情")
+                    details_window.title("Event Details")
                     details_window.geometry("600x400")
                     
                     text = tk.Text(details_window, wrap=tk.WORD, padx=10, pady=10)
                     text.pack(fill=tk.BOTH, expand=True)
                     
-                    # 查找完整的事件信息
-                    full_date = tree.item(tree.parent(item))['text'] + " " + values[0]
+                    # Find the complete event information
+                    event_date = values[0]  # Now using the full date-time string
                     event_data = None
                     
+                    # Search through all events to find the matching one
                     for events in self.events_by_date.values():
                         for e in events:
-                            if e.date == full_date and e.title == values[1]:
+                            if e.date == event_date and e.title == values[1]:
                                 event_data = e
                                 break
                         if event_data:
                             break
                     
                     if event_data:
-                        details = f"标题: {event_data.title}\n"
-                        details += f"日期: {event_data.date}\n"
-                        details += f"描述: {event_data.description}\n"
-                        details += f"基础分支: {event_data.base_branch}\n"
+                        details = f"Title: {event_data.title}\n"
+                        details += f"Date: {event_data.date}\n"
+                        details += f"Description: {event_data.description}\n"
+                        details += f"Base Branch: {event_data.base_branch}\n"
                         if event_data.created_branch:
-                            details += f"创建分支: {event_data.created_branch}\n"
+                            details += f"Created Branch: {event_data.created_branch}\n"
                         if event_data.created_tag:
-                            details += f"创建标签: {event_data.created_tag}\n"
+                            details += f"Created Tag: {event_data.created_tag}\n"
                         if hasattr(event_data, 'merged_branches_info') and event_data.merged_branches_info:
-                            details += "\n合并的分支信息:\n"
+                            details += "\nMerged branch information:\n"
                             for branch_info in event_data.merged_branches_info:
-                                details += f"\n分支: {branch_info['name']}\n"
-                                details += f"提交ID: {branch_info['commit_id']}\n"
-                                details += f"提交信息: {branch_info['commit_message']}\n"
-                                details += f"提交作者: {branch_info['commit_author']}\n"
-                                details += f"提交时间: {branch_info['commit_date']}\n"
+                                details += f"\nBranch: {branch_info['name']}\n"
+                                details += f"Commit ID: {branch_info['commit_id']}\n"
+                                details += f"Commit message: {branch_info['commit_message']}\n"
+                                details += f"Commit author: {branch_info['commit_author']}\n"
+                                details += f"Commit date: {branch_info['commit_date']}\n"
                         if event_data.notes:
-                            details += f"\n备注: {event_data.notes}\n"
+                            details += f"\nNotes: {event_data.notes}\n"
                         
                         text.insert('1.0', details)
                         text.configure(state='disabled')
         
-        # 绑定双击事件
+        # Bind double-click event
         tree.bind('<Double-1>', show_details)
         
-        # 初始显示
+        # Initial display
         update_tree("date")
 
     def setup_toolbar(self):
@@ -1117,7 +1119,7 @@ class GitEventManager:
         history_btn.pack(side=tk.RIGHT, padx=5)
 
     def on_base_item_selected(self, event):
-        """基础项目选择事件处理"""
+        """Base item selection event processing"""
         try:
             if not self.enable_branch_creation.get():
                 return
@@ -1127,7 +1129,7 @@ class GitEventManager:
             
             selected = self.base_items_listbox.get(self.base_items_listbox.curselection())
             if selected:
-                # 如果是远程分支，去掉 "(remote)" 后缀
+                # If it's a remote branch, remove "(remote)" suffix
                 branch_name = selected.split(' (remote)')[0]
                 self.branch_prefix.set(branch_name)
                 self.update_branch_name()
@@ -1137,18 +1139,18 @@ class GitEventManager:
             self.update_status("Failed to handle base item selection", success=False)
 
     def create_branch_section(self, parent):
-        """创建分支操作区域"""
+        """Create branch operations area"""
         branch_frame = ttk.LabelFrame(parent, text="1. Create Branch")
         branch_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 添加启用复选框
+        # Add enable checkbox
         enable_frame = ttk.Frame(branch_frame)
         enable_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Checkbutton(enable_frame, text="Enable Branch Creation", 
                         variable=self.enable_branch_creation,
                         command=self.update_sections_state).pack(side=tk.LEFT)
         
-        # 当前分支信息
+        # Current branch information
         current_branch_frame = ttk.Frame(branch_frame)
         current_branch_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -1157,7 +1159,7 @@ class GitEventManager:
                                             font=('TkDefaultFont', 9, 'bold'))
         self.current_branch_label.pack(side=tk.LEFT)
         
-        # 基础类型选择
+        # Base type selection
         base_type_frame = ttk.Frame(branch_frame)
         base_type_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -1169,37 +1171,37 @@ class GitEventManager:
                                    variable=self.base_type, command=self.update_base_items)
         tag_radio.pack(side=tk.LEFT)
         
-        # 基础项目选择 - 添加搜索功能
+        # Base item selection - add search functionality
         base_items_frame = ttk.Frame(branch_frame)
         base_items_frame.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Label(base_items_frame, text="Base Item:").pack(side=tk.LEFT)
         
-        # 添加搜索框
+        # Add search box
         self.base_search_var = tk.StringVar()
         search_entry = ttk.Entry(base_items_frame, textvariable=self.base_search_var)
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        # 创建列表框
+        # Create listbox
         listbox_frame = ttk.Frame(base_items_frame)
         listbox_frame.pack(fill=tk.X, expand=True, padx=5)
         
         self.base_items_listbox = tk.Listbox(listbox_frame, height=5, selectmode=tk.SINGLE)
         self.base_items_listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # 添加滚动条
+        # Add scrollbar
         base_scrollbar = ttk.Scrollbar(listbox_frame, orient="vertical", 
                                      command=self.base_items_listbox.yview)
         base_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.base_items_listbox.configure(yscrollcommand=base_scrollbar.set)
         
-        # 绑定搜索事件
+        # Bind search event
         self.base_search_var.trace_add("write", self.update_base_items)
         
-        # 绑定选择事件
+        # Bind selection event
         self.base_items_listbox.bind('<<ListboxSelect>>', self.on_base_item_selected)
         
-        # 分支前缀选择
+        # Branch prefix selection
         prefix_frame = ttk.Frame(branch_frame)
         prefix_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -1209,7 +1211,7 @@ class GitEventManager:
         prefix_combo.pack(side=tk.LEFT, padx=5)
         prefix_combo.bind('<<ComboboxSelected>>', self.update_branch_name)
         
-        # 自定义后缀
+        # Custom suffix
         custom_suffix_frame = ttk.Frame(branch_frame)
         custom_suffix_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -1218,7 +1220,7 @@ class GitEventManager:
         custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         custom_entry.bind('<KeyRelease>', self.update_branch_name)
         
-        # 日期后缀
+        # Date suffix
         date_suffix_frame = ttk.Frame(branch_frame)
         date_suffix_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -1227,7 +1229,7 @@ class GitEventManager:
         date_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         date_entry.bind('<KeyRelease>', self.update_branch_name)
         
-        # 分支名称预览
+        # Branch name preview
         preview_frame = ttk.Frame(branch_frame)
         preview_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -1235,23 +1237,23 @@ class GitEventManager:
         ttk.Entry(preview_frame, textvariable=self.final_branch_name, 
                   state='readonly').pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        # 刷新按钮
+        # Refresh button
         ttk.Button(preview_frame, text="↻", width=3, 
                    command=self.refresh_branch_name).pack(side=tk.RIGHT)
 
     def create_merge_section(self, parent):
-        """创建合并操作区域"""
+        """Create merge operations area"""
         merge_frame = ttk.LabelFrame(parent, text="2. Merge Branches/Tags")
         merge_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 添加启用复选框
+        # Add enable checkbox
         enable_frame = ttk.Frame(merge_frame)
         enable_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Checkbutton(enable_frame, text="Enable Merge Operation", 
                         variable=self.enable_merge,
                         command=self.update_sections_state).pack(side=tk.LEFT)
         
-        # 添加搜索框
+        # Add search box
         search_frame = ttk.Frame(merge_frame)
         search_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
@@ -1259,45 +1261,45 @@ class GitEventManager:
         search_entry = ttk.Entry(search_frame, textvariable=self.merge_search_var)
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        # 创建滚动框架
+        # Create scrollable frame
         scroll_frame = ttk.Frame(merge_frame)
         scroll_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 创建画布和滚动条
+        # Create canvas and scrollbar
         self.merge_canvas = tk.Canvas(scroll_frame, height=150)
         scrollbar = ttk.Scrollbar(scroll_frame, orient="vertical", 
                                  command=self.merge_canvas.yview)
         
-        # 创建内部框架
+        # Create internal frame
         self.merge_inner_frame = ttk.Frame(self.merge_canvas)
         
-        # 配置画布
+        # Configure canvas
         self.merge_canvas.configure(yscrollcommand=scrollbar.set)
         self.merge_canvas_window = self.merge_canvas.create_window(
             (0, 0), window=self.merge_inner_frame, anchor="nw"
         )
         
-        # 布局画布和滚动条
+        # Layout canvas and scrollbar
         self.merge_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # 创建分支和标签的字典来存储 Checkbutton
+        # Create dictionaries to store Checkbutton for branches and tags
         self.branch_checkbuttons = {}
         self.tag_checkbuttons = {}
         
         def update_merge_items():
-            """更新合并项目的显示"""
+            """Update display of merge items"""
             search_text = self.merge_search_var.get().lower()
             
-            # 清空内部框架
+            # Clear internal frame
             for widget in self.merge_inner_frame.winfo_children():
                 widget.destroy()
             
-            # 创建分支区域
+            # Create branch area
             branch_frame = ttk.LabelFrame(self.merge_inner_frame, text="Branches")
             branch_frame.pack(fill=tk.X, expand=True, padx=5, pady=5)
             
-            # 显示分支
+            # Display branches
             all_branches = sorted(set(self.cached_branches + 
                                     [f"{b} (remote)" for b in self.cached_remote_branches]))
             
@@ -1313,7 +1315,7 @@ class GitEventManager:
                     checkbox.pack(anchor='w', padx=20, pady=2)
                     self.branch_checkbuttons[branch] = checkbox
             
-            # 创建标签区域
+            # Create tag area
             if self.cached_tags:
                 tag_frame = ttk.LabelFrame(self.merge_inner_frame, text="Tags")
                 tag_frame.pack(fill=tk.X, expand=True, padx=5, pady=5)
@@ -1330,11 +1332,11 @@ class GitEventManager:
                         checkbox.pack(anchor='w', padx=20, pady=2)
                         self.tag_checkbuttons[tag] = checkbox
             
-            # 更新画布滚动区域
+            # Update canvas scroll region
             self.merge_inner_frame.update_idletasks()
             self.merge_canvas.configure(scrollregion=self.merge_canvas.bbox("all"))
         
-        # 绑定事件以更新滚动区域
+        # Bind event to update scroll region
         def on_frame_configure(event):
             self.merge_canvas.configure(scrollregion=self.merge_canvas.bbox("all"))
         
@@ -1345,31 +1347,31 @@ class GitEventManager:
         self.merge_inner_frame.bind("<Configure>", on_frame_configure)
         self.merge_canvas.bind("<Configure>", on_canvas_configure)
         
-        # 绑定搜索事件
+        # Bind search event
         self.merge_search_var.trace_add("write", lambda *args: update_merge_items())
         
-        # 绑定鼠标滚轮事件
+        # Bind mouse wheel event
         def on_mousewheel(event):
             self.merge_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
         
         self.merge_canvas.bind_all("<MouseWheel>", on_mousewheel)
         
-        # 初始显示所有项目
+        # Initial display all items
         update_merge_items()
 
     def create_tag_section(self, parent):
-        """创建标签操作区域"""
+        """Create tag operations area"""
         tag_frame = ttk.LabelFrame(parent, text="3. Create Tag")
         tag_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 添启用复选框
+        # Add enable checkbox
         enable_frame = ttk.Frame(tag_frame)
         enable_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Checkbutton(enable_frame, text="Enable Tag Creation", 
                         variable=self.enable_tag_creation,
                         command=self.update_sections_state).pack(side=tk.LEFT)
         
-        # 标签前缀
+        # Tag prefix
         prefix_frame = ttk.Frame(tag_frame)
         prefix_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Label(prefix_frame, text="Tag Prefix:").pack(side=tk.LEFT)
@@ -1377,7 +1379,7 @@ class GitEventManager:
         prefix_entry.pack(fill=tk.X, expand=True, padx=5)
         self.tag_controls.append(prefix_entry)
         
-        # 自定义后缀
+        # Custom suffix
         custom_frame = ttk.Frame(tag_frame)
         custom_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Label(custom_frame, text="Custom Suffix:").pack(side=tk.LEFT)
@@ -1385,7 +1387,7 @@ class GitEventManager:
         custom_entry.pack(fill=tk.X, expand=True, padx=5)
         self.tag_controls.append(custom_entry)
         
-        # 日期选择
+        # Date selection
         date_frame = ttk.Frame(tag_frame)
         date_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Label(date_frame, text="Date:").pack(side=tk.LEFT)
@@ -1393,7 +1395,7 @@ class GitEventManager:
         date_entry.pack(fill=tk.X, expand=True, padx=5)
         self.tag_controls.append(date_entry)
         
-        # 最终标签名称
+        # Final tag name
         final_frame = ttk.Frame(tag_frame)
         final_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Label(final_frame, text="Final Name:").pack(side=tk.LEFT)
@@ -1401,49 +1403,49 @@ class GitEventManager:
                                state='readonly')
         final_entry.pack(fill=tk.X, expand=True, padx=5)
         
-        # 添加事件绑定
+        # Add event bindings
         self.tag_prefix.trace_add("write", self.update_tag_name)
         self.tag_custom_suffix.trace_add("write", self.update_tag_name)
         self.tag_date_suffix.trace_add("write", self.update_tag_name)
 
     def create_execute_section(self, parent):
-        """创建统一执行区域"""
+        """Create unified execution area"""
         execute_frame = ttk.LabelFrame(parent, text="Execute Operations")
         execute_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 创建执行按钮
+        # Create execute button
         execute_btn = ttk.Button(execute_frame, text="Execute Selected Operations", 
                                 command=self.execute_operations)
         execute_btn.pack(fill=tk.X, padx=5, pady=5)
 
     def update_sections_state(self):
-        """更新所有域的状态"""
-        # 更新分支创建区域
+        """Update state of all domains"""
+        # Update branch creation area
         state = 'normal' if self.enable_branch_creation.get() else 'disabled'
         for widget in self.branch_controls:
             if isinstance(widget, (ttk.Entry, ttk.Combobox, ttk.Button, ttk.Radiobutton)):
                 widget.configure(state=state)
         
-        # 更新合并区域
+        # Update merge area
         state = 'normal' if self.enable_merge.get() else 'disabled'
         for widget in self.merge_controls:
             if isinstance(widget, (ttk.Entry, ttk.Combobox, ttk.Button, ttk.Checkbutton)):
                 widget.configure(state=state)
         
-        # 更新标签创建区域
+        # Update tag creation area
         state = 'normal' if self.enable_tag_creation.get() else 'disabled'
         for widget in self.tag_controls:
             if isinstance(widget, (ttk.Entry, ttk.Combobox, ttk.Button)):
                 widget.configure(state=state)
 
     def execute_operations(self):
-        """执行所有选中的操作"""
+        """Execute all selected operations"""
         try:
             operations_executed = []
             any_operation_enabled = False
-            self.last_merged_info = None  # 添加类属性来存储最近的合并信息
+            self.last_merged_info = None  # Add class attribute to store the latest merge information
             
-            # 1. 创建分支
+            # 1. Create branch
             if self.enable_branch_creation.get():
                 any_operation_enabled = True
                 branch_name = self.final_branch_name.get()
@@ -1451,14 +1453,14 @@ class GitEventManager:
                     self.create_branch()
                     operations_executed.append(f"Created branch '{branch_name}'")
             
-            # 2. 执行合并
+            # 2. Execute merge
             if self.enable_merge.get():
                 any_operation_enabled = True
-                self.last_merged_info = self.merge_branches()  # 保存合并信息
+                self.last_merged_info = self.merge_branches()  # Save merge information
                 if self.last_merged_info:
                     operations_executed.append(f"Merged {len(self.last_merged_info)} items")
             
-            # 3. 创建标签
+            # 3. Create tag
             if self.enable_tag_creation.get():
                 any_operation_enabled = True
                 tag_name = self.final_tag_name.get()
@@ -1466,12 +1468,12 @@ class GitEventManager:
                     self.create_tag()
                     operations_executed.append(f"Created tag '{tag_name}'")
             
-            # 检查是否有操作被启用
+            # Check if any operation is enabled
             if not any_operation_enabled:
                 messagebox.showwarning("Warning", "No operations were selected")
                 return
             
-            # 显示执行结果
+            # Show execution result
             if operations_executed:
                 success_message = "\n".join(operations_executed)
                 self.log_operation("Executed operations:\n" + success_message)
@@ -1485,19 +1487,19 @@ class GitEventManager:
             messagebox.showerror("Error", f"Failed to execute operations: {error_msg}")
 
     def create_push_section(self, parent):
-        """创建Push操作区域"""
+        """Create Push operations area"""
         push_frame = ttk.LabelFrame(parent, text="4. Push to Remote")
         push_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 创建复选框变量
+        # Create checkbox variables
         self.push_branch_var = tk.BooleanVar()
         self.push_tag_var = tk.BooleanVar()
         
-        # 显示当前分支和标签
+        # Display current branch and tag
         current_info_frame = ttk.Frame(push_frame)
         current_info_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 分支信息
+        # Branch information
         branch_frame = ttk.Frame(current_info_frame)
         branch_frame.pack(fill=tk.X, pady=2)
         ttk.Checkbutton(branch_frame, text="Current Branch:", 
@@ -1505,7 +1507,7 @@ class GitEventManager:
         self.push_branch_label = ttk.Label(branch_frame, text="", font=('TkDefaultFont', 9, 'bold'))
         self.push_branch_label.pack(side=tk.LEFT, padx=5)
         
-        # 标签信息
+        # Tag information
         tag_frame = ttk.Frame(current_info_frame)
         tag_frame.pack(fill=tk.X, pady=2)
         ttk.Checkbutton(tag_frame, text="Current Tag:", 
@@ -1513,19 +1515,19 @@ class GitEventManager:
         self.push_tag_label = ttk.Label(tag_frame, text="", font=('TkDefaultFont', 9, 'bold'))
         self.push_tag_label.pack(side=tk.LEFT, padx=5)
         
-        # Push按钮
+        # Push button
         ttk.Button(push_frame, text="Push Selected to Remote", 
                    command=self.push_to_remote).pack(fill=tk.X, padx=5, pady=5)
 
     def update_push_labels(self):
-        """更新Push区域的标签显示"""
+        """Update Push area labels"""
         try:
-            # 更新分支标签 - 使用当前实际分支名称
+            # Update branch label - use the actual current branch name
             current_branch = self.repo.active_branch.name
             self.push_branch_label.config(text=current_branch)
             self.push_branch_var.set(True)
             
-            # 更新标签标签
+            # Update tag label
             tag_name = self.final_tag_name.get()
             if tag_name:
                 self.push_tag_label.config(text=tag_name)
@@ -1539,16 +1541,16 @@ class GitEventManager:
             self.update_status("Failed to update push labels", success=False)
 
     def push_to_remote(self):
-        """推送选中的分支和标签到远程"""
+        """Push selected branches and tags to remote"""
         try:
             remote = self.repo.remote()
             pushed_items = []
             
-            # 推送分支
+            # Push branch
             if self.push_branch_var.get():
                 current_branch = self.repo.active_branch.name
                 try:
-                    # 使用 --set-upstream 推送当前分支
+                    # Use --set-upstream to push the current branch
                     self.repo.git.push('--set-upstream', remote.name, current_branch)
                     pushed_items.append(f"branch '{current_branch}'")
                     self.log_operation(f"Pushed branch {current_branch} to remote with upstream")
@@ -1556,7 +1558,7 @@ class GitEventManager:
                     self.log_operation(f"Error pushing branch: {str(branch_error)}")
                     messagebox.showerror("Branch Push Error", f"Failed to push branch: {str(branch_error)}")
             
-            # 推送标签
+            # Push tag
             if self.push_tag_var.get():
                 tag_name = self.final_tag_name.get()
                 if tag_name:
@@ -1573,7 +1575,7 @@ class GitEventManager:
                 self.update_status(f"Successfully pushed {items_str} to remote", success=True)
                 messagebox.showinfo("Success", f"Successfully pushed {items_str} to remote")
                 
-                # 推送成功后刷新库缓存
+                # Refresh repository cache after push is successful
                 self.refresh_repo_cache()
             else:
                 messagebox.showwarning("Warning", "No items selected for push")
@@ -1585,12 +1587,12 @@ class GitEventManager:
             messagebox.showerror("Error", f"Failed to push to remote: {error_msg}")
 
     def check_git_config(self):
-        """检查并设置Git用户信息"""
+        """Check and set Git user information"""
         try:
-            # 使用 git.Git() 而不是 self.repo.git
+            # Use git.Git() instead of self.repo.git
             git_cmd = git.Git()
             
-            # 检查是否已配置用户信息
+            # Check if user information is configured
             try:
                 user_name = git_cmd.config('--get', 'user.name')
                 user_email = git_cmd.config('--get', 'user.email')
@@ -1598,23 +1600,23 @@ class GitEventManager:
                 user_name = ''
                 user_email = ''
             
-            # 如果没有配置，弹出配置对话框
+            # If not configured, show configuration dialog
             if not user_name or not user_email:
                 self.configure_git_user()
             
         except Exception as e:
-            self.log_operation(f"检查git配置时出错: {str(e)}")
-            self.update_status("检查git配置失败", success=False)
+            self.log_operation(f"Error checking git configuration: {str(e)}")
+            self.update_status("Failed to check git configuration", success=False)
 
     def configure_git_user(self):
-        """配置Git用户信息对话框"""
+        """Configure Git user information dialog"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Configure Git User")
         dialog.geometry("400x150")
         dialog.transient(self.root)
         dialog.grab_set()
         
-        # 用户名
+        # User name
         name_frame = ttk.Frame(dialog)
         name_frame.pack(fill=tk.X, padx=10, pady=5)
         ttk.Label(name_frame, text="User Name:").pack(side=tk.LEFT)
@@ -1622,7 +1624,7 @@ class GitEventManager:
         name_entry = ttk.Entry(name_frame, textvariable=name_var)
         name_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        # 邮箱
+        # Email
         email_frame = ttk.Frame(dialog)
         email_frame.pack(fill=tk.X, padx=10, pady=5)
         ttk.Label(email_frame, text="User Email:").pack(side=tk.LEFT)
@@ -1631,7 +1633,7 @@ class GitEventManager:
         email_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         def save_config():
-            """保存Git用户配置"""
+            """Save Git user configuration"""
             name = name_var.get().strip()
             email = email_var.get().strip()
             
@@ -1640,10 +1642,10 @@ class GitEventManager:
                 return
             
             try:
-                # 使用 git.Git() 而不是 self.repo.git
+                # Use git.Git() instead of self.repo.git
                 git_cmd = git.Git()
                 
-                # 设置全局Git配置
+                # Set global Git configuration
                 git_cmd.config('--global', 'user.name', name)
                 git_cmd.config('--global', 'user.email', email)
                 
@@ -1658,41 +1660,41 @@ class GitEventManager:
                 self.update_status("Failed to configure git user", success=False)
                 messagebox.showerror("Error", f"Failed to configure git user: {error_msg}")
         
-        # 按钮
+        # Buttons
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
         ttk.Button(btn_frame, text="Save", command=save_config).pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
         
-        # 设置焦点
+        # Set focus
         name_entry.focus()
 
     def create_events_path_section(self, parent):
-        """创建事件存储路径选择区域"""
+        """Create event storage path selection area"""
         events_frame = ttk.LabelFrame(parent, text="Events Storage")
         events_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # 创建内部框架
+        # Create inner frame
         inner_frame = ttk.Frame(events_frame)
         inner_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 路径输入框
+        # Path entry
         path_entry = ttk.Entry(inner_frame, textvariable=self.events_path, state='readonly')
         path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
         
-        # 浏览按钮
+        # Browse button
         select_path_btn = ttk.Button(inner_frame, text="Browse", command=self.select_events_path)
         select_path_btn.pack(side=tk.RIGHT)
 
     def select_events_path(self):
-        """选择事件存储路径"""
+        """Select event storage path"""
         path = filedialog.askdirectory(
             title="Select Events Storage Directory",
             initialdir=self.events_path.get()
         )
         if path:
             self.events_path.set(path)
-            self.load_all_events()  # 重新加载事件
+            self.load_all_events()  # Reload events
 
 if __name__ == "__main__":
     app = GitEventManager()
