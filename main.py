@@ -201,7 +201,7 @@ class GitEventManager:
             for widget in self.merge_inner_frame.winfo_children():
                 widget.destroy()
             
-            # 获��分支
+            # 获分支
             current = self.repo.active_branch.name
             
             # 使用缓存的分支信息
@@ -661,18 +661,17 @@ class GitEventManager:
                 return
             
             # 获取基础项目（从 Listbox 获取选中项）
-            if not self.base_items_listbox.curselection():
-                messagebox.showerror("Error", "Please select a base item")
-                return
-            
-            base_item = self.base_items_listbox.get(self.base_items_listbox.curselection())
-            if not base_item:
-                messagebox.showerror("Error", "Please select a base item")
-                return
-            
-            # 如果是远程分支，去掉 "(remote)" 后缀
-            if "(remote)" in base_item:
-                base_item = base_item.split(" (remote)")[0]
+            selections = self.base_items_listbox.curselection()
+            if not selections:  # 修改这里的检查逻辑
+                # 如果没有选择基础项目，但有自动生成的分支名称，则使用当前分支作为基础
+                current_branch = self.repo.active_branch.name
+                base_item = current_branch
+                self.log_operation(f"No base item selected, using current branch: {current_branch}")
+            else:
+                base_item = self.base_items_listbox.get(selections[0])
+                # 如果是远程分支，去掉 "(remote)" 后缀
+                if "(remote)" in base_item:
+                    base_item = base_item.split(" (remote)")[0]
             
             # 记录操作
             self.log_operation(f"Creating new branch: {new_branch_name}", 
@@ -1267,7 +1266,7 @@ class GitEventManager:
         tag_frame = ttk.LabelFrame(parent, text="3. Create Tag")
         tag_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 添��启用复选框
+        # 添启用复选框
         enable_frame = ttk.Frame(tag_frame)
         enable_frame.pack(fill=tk.X, padx=5, pady=2)
         ttk.Checkbutton(enable_frame, text="Enable Tag Creation", 
