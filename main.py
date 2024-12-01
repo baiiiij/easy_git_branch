@@ -17,6 +17,7 @@ class GitEvent:
         self.merged_branches_info = []
         self.created_tag = ""
         self.notes = ""
+        self.base_branch = ""
 
 class GitEventManager:
     def __init__(self):
@@ -28,8 +29,20 @@ class GitEventManager:
         self.root.title("Git Event Manager")
         print("Window title set successfully")
         
-        # 初始化路径变量 - 移除默认值
+        # 初始化路径变量
         self.repo_path = tk.StringVar()  # 移除 value=os.getcwd()
+        
+        # 设置事件存储路径 - 移到这里
+        self.events_base_path = os.path.expanduser("~/git_branch_manager/git_events")
+        self.events_path = tk.StringVar(value=self.events_base_path)
+        
+        # 确保基础目录存在
+        os.makedirs(self.events_base_path, exist_ok=True)
+        
+        # 初始化事件存储相关变量
+        self.current_event_file = None
+        self.events_by_date = {}  # 按日期组织的事件
+        self.events_by_branch = {}  # 按分支组织的事件
         
         # 初始化操作计数
         self.operation_count = 0
@@ -71,12 +84,12 @@ class GitEventManager:
         print("Starting UI setup...")
         self.setup_ui()
         print("UI setup completed")
-
-        # 移除自动初始化仓库
-        # self.init_repo()
         
-        # 检并设置Git用户信息
+        # 检查并设置Git用户信息
         self.check_git_config()
+        
+        # 加载所有事件文件
+        self.load_all_events()
 
     def select_repo_path(self):
         """选择仓库路径"""
@@ -255,9 +268,9 @@ class GitEventManager:
             self.update_status("Failed to refresh tag name", success=False)
 
     def update_branch_name(self, *args):
-        """更新最终分支名称"""
+        """更新最终分支称"""
         try:
-            # 果区域被禁用且不是初始化调用，则返回
+            # 果域被禁用且不是初始化调用，则返回
             if not self.enable_branch_creation.get() and args:
                 return
             
@@ -437,6 +450,7 @@ class GitEventManager:
         
         # 4. 创左侧面板
         left_panel = self.create_left_panel(main_paned)
+        self.create_events_path_section(left_panel)
         
         # 5. 将左右面板添加到主分割窗口
         main_paned.add(left_panel)
@@ -544,7 +558,7 @@ class GitEventManager:
         self.status_text.grid(row=0, column=0, sticky='nsew', padx=(0, 2))  # 添加右侧padding
         status_scrollbar.grid(row=0, column=1, sticky='ns')
         
-        # 配置文本框的滚动
+        # 配���文本框的滚动
         self.status_text.configure(yscrollcommand=status_scrollbar.set)
         
         # 配置grid权重
@@ -662,7 +676,7 @@ class GitEventManager:
             
             # 获取基础项目（从 Listbox 获取选中项）
             selections = self.base_items_listbox.curselection()
-            if not selections:  # 修改这里的检查逻辑
+            if not selections:
                 # 如果没有选择基础项目，但有自动生成的分支名称，则使用当前分支作为基础
                 current_branch = self.repo.active_branch.name
                 base_item = current_branch
@@ -672,6 +686,9 @@ class GitEventManager:
                 # 如果是远程分支，去掉 "(remote)" 后缀
                 if "(remote)" in base_item:
                     base_item = base_item.split(" (remote)")[0]
+            
+            # 保存基础分支名称供后续使用
+            self.current_base_branch = base_item
             
             # 记录操作
             self.log_operation(f"Creating new branch: {new_branch_name}", 
@@ -818,7 +835,7 @@ class GitEventManager:
     def create_tag(self):
         """创建新标签"""
         try:
-            # 获取新标签名
+            # 获新标签名
             new_tag_name = self.final_tag_name.get()
             if not new_tag_name:
                 messagebox.showerror("Error", "Tag name cannot be empty")
@@ -856,7 +873,7 @@ class GitEventManager:
         self.root.mainloop()
 
     def save_current_event(self):
-        """保存当前事件，包含更详细的合并信息"""
+        """保存当前事件"""
         try:
             if not self.event_title.get():
                 messagebox.showwarning("Warning", "请输入事件标题")
@@ -864,19 +881,39 @@ class GitEventManager:
             
             event = GitEvent()
             event.title = self.event_title.get()
-            event.date = datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
+            event.date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             event.description = self.event_description.get()
             event.created_branch = self.final_branch_name.get()
             event.created_tag = self.final_tag_name.get()
             event.notes = self.event_notes.get()
+            
+            # 使用保存的基础分支名称
+            event.base_branch = getattr(self, 'current_base_branch', self.repo.active_branch.name)
             
             # 使用执行操作时保存的合并信息
             if hasattr(self, 'last_merged_info') and self.last_merged_info:
                 event.merged_branches_info = self.last_merged_info
                 event.merged_branches = [info['name'] for info in self.last_merged_info]
             
-            self.events.append(event)
-            self.save_events_to_file()
+            # 创建日期目录
+            date_dir = os.path.join(self.events_path.get(), 
+                                   datetime.now().strftime('%Y-%m-%d'))
+            os.makedirs(date_dir, exist_ok=True)
+            
+            # 创建文件名（使用时间戳和分支名）
+            timestamp = datetime.now().strftime('%H%M%S')
+            branch_name = self.repo.active_branch.name.replace('/', '_')
+            filename = f"{timestamp}_{branch_name}.json"
+            
+            # 完整的文件路径
+            file_path = os.path.join(date_dir, filename)
+            
+            # 保存事件
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(event.__dict__, f, ensure_ascii=False, indent=2)
+            
+            # 更新事件缓存
+            self.load_all_events()
             
             # 显示成功消息
             messagebox.showinfo("Success", "事件保存成功")
@@ -885,7 +922,8 @@ class GitEventManager:
             self.event_title.set("")
             self.event_description.set("")
             self.event_notes.set("")
-            self.last_merged_info = None  # 空合并信息
+            self.last_merged_info = None
+            self.current_base_branch = None  # 清除基础分支记录
             
         except Exception as e:
             error_msg = str(e)
@@ -893,125 +931,183 @@ class GitEventManager:
             self.update_status("保存事件失败", success=False)
             messagebox.showerror("Error", f"保存事件失败: {error_msg}")
 
-    def save_events_to_file(self):
-        """将事件保存到文件，包含详细的合并信息"""
-        events_data = []
-        for event in self.events:
-            event_dict = {
-                'title': event.title,
-                'date': event.date,
-                'description': event.description,
-                'created_branch': event.created_branch,
-                'merged_branches': event.merged_branches,
-                'merged_branches_info': event.merged_branches_info,  # 新增：保存详细的合并信息
-                'created_tag': event.created_tag,
-                'notes': event.notes
-            }
-            events_data.append(event_dict)
-            
-        with open('git_events.json', 'w', encoding='utf-8') as f:
-            json.dump(events_data, f, ensure_ascii=False, indent=2)
-            
-    def load_events_from_file(self):
-        """从文件加载事件，包含详细的合并信息"""
+    def load_all_events(self):
+        """加载所有事件文件"""
         try:
-            with open('git_events.json', 'r', encoding='utf-8') as f:
-                events_data = json.load(f)
-                
-            self.events = []
-            for event_dict in events_data:
-                event = GitEvent()
-                event.title = event_dict['title']
-                event.date = event_dict['date']
-                event.description = event_dict['description']
-                event.created_branch = event_dict['created_branch']
-                event.merged_branches = event_dict['merged_branches']
-                event.merged_branches_info = event_dict.get('merged_branches_info', [])  # 兼容旧数据
-                event.created_tag = event_dict['created_tag']
-                event.notes = event_dict['notes']
-                self.events.append(event)
-        except FileNotFoundError:
-            pass
+            self.events_by_date = {}
+            self.events_by_branch = {}
             
+            # 遍历事件目录
+            for root, dirs, files in os.walk(self.events_path.get()):
+                for file in files:
+                    if file.endswith('.json'):
+                        file_path = os.path.join(root, file)
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            event_data = json.load(f)
+                            
+                            # 创建事件对象
+                            event = GitEvent()
+                            for key, value in event_data.items():
+                                setattr(event, key, value)
+                            
+                            # 按日期组织
+                            date = event.date.split()[0]
+                            if date not in self.events_by_date:
+                                self.events_by_date[date] = []
+                            self.events_by_date[date].append(event)
+                            
+                            # 按分支组织
+                            branch = event.base_branch
+                            if branch not in self.events_by_branch:
+                                self.events_by_branch[branch] = []
+                            self.events_by_branch[branch].append(event)
+            
+        except Exception as e:
+            self.log_operation(f"加载事件时出错: {str(e)}")
+            self.update_status("加载事件失败", success=False)
+
     def show_event_history(self):
-        """显示更详细的事件历史"""
+        """显示事件历史"""
         history_window = tk.Toplevel(self.root)
-        history_window.title("事件历史")
-        history_window.geometry("800x600")
+        history_window.title("事历史")
+        history_window.geometry("1000x600")
+        
+        # 创建左右分割面板
+        paned = ttk.PanedWindow(history_window, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True)
+        
+        # 左侧过滤面板
+        filter_frame = ttk.Frame(paned)
+        paned.add(filter_frame)
+        
+        # 创建过滤选项
+        ttk.Label(filter_frame, text="查看方式:").pack(pady=5)
+        view_var = tk.StringVar(value="date")
+        ttk.Radiobutton(filter_frame, text="按日期", variable=view_var, 
+                        value="date", command=lambda: update_tree("date")).pack()
+        ttk.Radiobutton(filter_frame, text="按分支", variable=view_var, 
+                        value="branch", command=lambda: update_tree("branch")).pack()
+        
+        # 搜索框
+        ttk.Label(filter_frame, text="搜索:").pack(pady=(10,0))
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(filter_frame, textvariable=search_var)
+        search_entry.pack(pady=5)
+        
+        # 右侧事件显示区域
+        right_frame = ttk.Frame(paned)
+        paned.add(right_frame)
         
         # 创建树形视图
-        tree = ttk.Treeview(history_window, columns=(
-            'Date', 'Title', 'Branch', 'Tag', 'Description'
+        tree = ttk.Treeview(right_frame, columns=(
+            'Time', 'Title', 'Branch', 'Tag', 'Description'
         ), show='headings')
         
-        tree.heading('Date', text='日期')
+        tree.heading('Time', text='时间')
         tree.heading('Title', text='标题')
         tree.heading('Branch', text='创建分支')
         tree.heading('Tag', text='创建标签')
         tree.heading('Description', text='描述')
         
         # 设置列宽
-        tree.column('Date', width=150)
+        tree.column('Time', width=150)
         tree.column('Title', width=150)
         tree.column('Branch', width=150)
         tree.column('Tag', width=100)
         tree.column('Description', width=200)
         
         # 添加滚动条
-        scrollbar = ttk.Scrollbar(history_window, orient=tk.VERTICAL, command=tree.yview)
+        scrollbar = ttk.Scrollbar(right_frame, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
-        
-        # 添加数据
-        for event in reversed(self.events):  # 最新的事件显示在最上面
-            tree.insert('', 'end', values=(
-                event.date,
-                event.title,
-                event.created_branch,
-                event.created_tag,
-                event.description
-            ))
-        
-        def show_details(event):
-            """显示事件详细信息"""
-            item = tree.selection()[0]
-            event_data = self.events[len(self.events) - 1 - tree.index(item)]  # 反向索引
-            
-            details_window = tk.Toplevel(history_window)
-            details_window.title("事件详细信息")
-            details_window.geometry("600x400")
-            
-            # 使用Text控件显示详细信息
-            text = tk.Text(details_window, wrap=tk.WORD, padx=10, pady=10)
-            text.pack(fill=tk.BOTH, expand=True)
-            
-            # 添加详细信息
-            details = f"标题: {event_data.title}\n"
-            details += f"日期: {event_data.date}\n"
-            details += f"描述: {event_data.description}\n"
-            if event_data.created_branch:
-                details += f"创建分支: {event_data.created_branch}\n"
-            if event_data.created_tag:
-                details += f"创建标签: {event_data.created_tag}\n"
-            if event_data.merged_branches_info:
-                details += "\n合并的分支信息:\n"
-                for branch_info in event_data.merged_branches_info:
-                    details += f"\n分支: {branch_info['name']}\n"
-                    details += f"提交ID: {branch_info['commit_id']}\n"
-                    details += f"提交信息: {branch_info['commit_message']}\n"
-                    details += f"提交作者: {branch_info['commit_author']}\n"
-                    details += f"提交时间: {branch_info['commit_date']}\n"
-            if event_data.notes:
-                details += f"\n备注: {event_data.notes}\n"
-            
-            text.insert('1.0', details)
-            text.configure(state='disabled')
-        
-        # 绑定双击事件
-        tree.bind('<Double-1>', show_details)
         
         # 布局
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        def update_tree(view_type):
+            """更新树形视图"""
+            tree.delete(*tree.get_children())
+            search_text = search_var.get().lower()
+            
+            if view_type == "date":
+                data = self.events_by_date
+            else:
+                data = self.events_by_branch
+            
+            for key in sorted(data.keys(), reverse=True):
+                parent = tree.insert('', 'end', text=key, open=True)
+                for event in sorted(data[key], key=lambda x: x.date, reverse=True):
+                    if (search_text in event.title.lower() or 
+                        search_text in event.description.lower() or
+                        search_text in event.created_branch.lower()):
+                        tree.insert(parent, 'end', values=(
+                            event.date.split()[1],
+                            event.title,
+                            event.created_branch,
+                            event.created_tag,
+                            event.description
+                        ))
+        
+        def on_search(*args):
+            """搜索事件处理"""
+            update_tree(view_var.get())
+        
+        # 绑定搜索事件
+        search_var.trace_add("write", on_search)
+        
+        # 显示事件详情
+        def show_details(event):
+            item = tree.selection()[0]
+            if tree.parent(item):  # 确保选择的是事件而不是分组
+                values = tree.item(item)['values']
+                if values:
+                    details_window = tk.Toplevel(history_window)
+                    details_window.title("事件详情")
+                    details_window.geometry("600x400")
+                    
+                    text = tk.Text(details_window, wrap=tk.WORD, padx=10, pady=10)
+                    text.pack(fill=tk.BOTH, expand=True)
+                    
+                    # 查找完整的事件信息
+                    full_date = tree.item(tree.parent(item))['text'] + " " + values[0]
+                    event_data = None
+                    
+                    for events in self.events_by_date.values():
+                        for e in events:
+                            if e.date == full_date and e.title == values[1]:
+                                event_data = e
+                                break
+                        if event_data:
+                            break
+                    
+                    if event_data:
+                        details = f"标题: {event_data.title}\n"
+                        details += f"日期: {event_data.date}\n"
+                        details += f"描述: {event_data.description}\n"
+                        details += f"基础分支: {event_data.base_branch}\n"
+                        if event_data.created_branch:
+                            details += f"创建分支: {event_data.created_branch}\n"
+                        if event_data.created_tag:
+                            details += f"创建标签: {event_data.created_tag}\n"
+                        if hasattr(event_data, 'merged_branches_info') and event_data.merged_branches_info:
+                            details += "\n合并的分支信息:\n"
+                            for branch_info in event_data.merged_branches_info:
+                                details += f"\n分支: {branch_info['name']}\n"
+                                details += f"提交ID: {branch_info['commit_id']}\n"
+                                details += f"提交信息: {branch_info['commit_message']}\n"
+                                details += f"提交作者: {branch_info['commit_author']}\n"
+                                details += f"提交时间: {branch_info['commit_date']}\n"
+                        if event_data.notes:
+                            details += f"\n备注: {event_data.notes}\n"
+                        
+                        text.insert('1.0', details)
+                        text.configure(state='disabled')
+        
+        # 绑定双击事件
+        tree.bind('<Double-1>', show_details)
+        
+        # 初始显示
+        update_tree("date")
 
     def setup_toolbar(self):
         toolbar = ttk.Frame(self.root)
@@ -1570,6 +1666,33 @@ class GitEventManager:
         
         # 设置焦点
         name_entry.focus()
+
+    def create_events_path_section(self, parent):
+        """创建事件存储路径选择区域"""
+        events_frame = ttk.LabelFrame(parent, text="Events Storage")
+        events_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # 创建内部框架
+        inner_frame = ttk.Frame(events_frame)
+        inner_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # 路径输入框
+        path_entry = ttk.Entry(inner_frame, textvariable=self.events_path, state='readonly')
+        path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        
+        # 浏览按钮
+        select_path_btn = ttk.Button(inner_frame, text="Browse", command=self.select_events_path)
+        select_path_btn.pack(side=tk.RIGHT)
+
+    def select_events_path(self):
+        """选择事件存储路径"""
+        path = filedialog.askdirectory(
+            title="Select Events Storage Directory",
+            initialdir=self.events_path.get()
+        )
+        if path:
+            self.events_path.set(path)
+            self.load_all_events()  # 重新加载事件
 
 if __name__ == "__main__":
     app = GitEventManager()
